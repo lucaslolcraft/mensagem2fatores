@@ -4,8 +4,8 @@ import '../models/chat_message.dart';
 import '../services/chat_service.dart';
 
 class ChatPage extends StatefulWidget {
-  final String myId;       // Agora é o ID humano (ex: "alice")
-  final String partnerId;  // Agora é o ID humano (ex: "bob")
+  final String myId;
+  final String partnerId;
   final ChatService chatService;
 
   const ChatPage({
@@ -21,54 +21,73 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
-  List<ChatMessage> _messages = []; // Agora a lista será substituída pelo Stream
+  final ScrollController _scrollController = ScrollController();
+  List<ChatMessage> _messages = [];
   StreamSubscription? _messageSubscription;
 
   @override
   void initState() {
     super.initState();
-    // O stream agora retorna a lista completa de mensagens.
-    _messageSubscription = widget.chatService.listenForMessages().listen((messages) {
+    // O stream do ChatService agora retorna a LISTA COMPLETA de mensagens
+    _messageSubscription = widget.chatService.listenForMessages().listen((messageList) {
       if (mounted) {
         setState(() {
-          _messages = messages; // Substitui a lista local pela lista vinda do Firestore
+          _messages = messageList; // Apenas substitui a lista local pela nova
         });
+        // Rola para o final da lista sempre que novas mensagens chegam
+        _scrollToBottom();
       }
     });
   }
 
   void _sendMessage() async {
-    final text = _messageController.text;
+    final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Adiciona otimisticamente à UI. O Firestore vai atualizar em seguida.
-    final myMessage = ChatMessage(senderId: widget.myId, content: text);
+    final tempMessage = ChatMessage(senderId: widget.myId, content: text);
+    
+    // "Atualização Otimista": Adiciona a mensagem à UI imediatamente
+    // para uma experiência de usuário mais rápida. O Firestore irá confirmar em seguida.
     setState(() {
-      _messages.add(myMessage);
+      _messages.add(tempMessage);
     });
-
-    // A nova função sendMessage é mais simples
-    await widget.chatService.sendMessage(
-      senderId: widget.myId,
-      text: text,
-    );
-
+    _scrollToBottom();
     _messageController.clear();
+
+    // A nova função sendMessage é mais simples, só precisa do remetente e do texto
+    try {
+      await widget.chatService.sendMessage(
+        senderId: widget.myId,
+        text: text,
+      );
+    } catch (e) {
+      print("Erro ao enviar mensagem: $e");
+      // Opcional: mostrar um erro na UI
+      setState(() {
+        _messages.remove(tempMessage); // Remove a mensagem que falhou ao enviar
+      });
+    }
+  }
+
+  // Função para rolar a lista para a mensagem mais recente
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   @override
   void dispose() {
     _messageSubscription?.cancel();
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // O build method não precisa de NENHUMA alteração.
-    // A lógica 'isMe' continua funcionando pois 'widget.myId' é "alice",
-    // e 'message.senderId' também será "alice".
-    // ... cole aqui o seu método build() da ChatPage anterior ...
     return Scaffold(
       appBar: AppBar(
         title: Text('Chat com ${widget.partnerId}'),
@@ -78,10 +97,12 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(8.0),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
+                // Esta lógica continua funcionando perfeitamente
                 final isMe = message.senderId == widget.myId;
                 return Align(
                   alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

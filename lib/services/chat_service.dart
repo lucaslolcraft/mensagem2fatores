@@ -7,36 +7,39 @@ class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late CriptoService _criptoService;
   late String _chatId;
+  late String _myId;
+  late String _myActivePublicKey;
+  late String _partnerActivePublicKey;
 
-  // --- LÓGICA DE TROCA DE CHAVES VIA FIRESTORE ---
-
-  // Publica a chave pública de um usuário em uma coleção 'public_keys'
   Future<void> publishPublicKey({required String myId, required String publicKey}) async {
     await _firestore.collection('public_keys').doc(myId).set({'key': publicKey});
   }
 
-  // Ouve pela chave pública do parceiro na coleção 'public_keys'
   Stream<String> listenForPartnerKey(String partnerId) {
     return _firestore
         .collection('public_keys')
         .doc(partnerId)
         .snapshots()
         .map((snapshot) {
-            if (snapshot.exists && snapshot.data() != null) {
-              return snapshot.data()!['key'] as String;
-            }
-            throw Exception('Documento da chave do parceiro não encontrado ou vazio.');
-        });
+      if (snapshot.exists && snapshot.data() != null) {
+        return snapshot.data()!['key'] as String;
+      }
+      // Retornamos uma string vazia para o listen não quebrar, o timeout vai tratar.
+      return '';
+    }).where((key) => key.isNotEmpty); // Só emite se a chave não for vazia
   }
-
-  // --- LÓGICA DO CHAT ---
 
   void initialize({
     required CriptoService criptoService,
     required String myId,
     required String partnerId,
+    required String myActivePublicKey,
+    required String partnerActivePublicKey,
   }) {
     _criptoService = criptoService;
+    _myId = myId;
+    _myActivePublicKey = myActivePublicKey;
+    _partnerActivePublicKey = partnerActivePublicKey;
     List<String> ids = [myId, partnerId];
     ids.sort();
     _chatId = ids.join('_');
@@ -47,7 +50,16 @@ class ChatService {
     required String text,
   }) async {
     if (text.isEmpty) return;
-    final encryptedText = await _criptoService.encrypt(text);
+
+    final secretKey = await _criptoService.deriveActiveSecretKey(
+      partnerActivePublicKeyBase64: _partnerActivePublicKey,
+    );
+    final encryptedText = await _criptoService.encrypt(text, secretKey: secretKey);
+
+    print("--- 📤 ENVIANDO MENSAGEM --- (Usuário: $_myId)");
+    print("   🏷️ Etiquetando com Minha Chave Pública Ativa: ${_myActivePublicKey.substring(0, 15)}...");
+    print("   🏷️ Etiquetando com Chave Pública do Parceiro: ${_partnerActivePublicKey.substring(0, 15)}...");
+
     await _firestore
         .collection('chats')
         .doc(_chatId)
@@ -56,10 +68,13 @@ class ChatService {
       'senderId': senderId,
       'content': encryptedText,
       'timestamp': FieldValue.serverTimestamp(),
+      'encryptionKeys': {
+        'senderPublicKey': _myActivePublicKey,
+        'receiverPublicKey': _partnerActivePublicKey,
+      }
     });
   }
 
-  // Retorna um Stream com a LISTA COMPLETA de mensagens já descriptografadas
   Stream<List<ChatMessage>> listenForMessages() {
     return _firestore
         .collection('chats')
@@ -71,17 +86,35 @@ class ChatService {
       List<ChatMessage> messages = [];
       for (final doc in snapshot.docs) {
         final data = doc.data();
+        print("\n--- 📥 MENSAGEM RECEBIDA --- (Usuário: $_myId)");
         try {
-          final decryptedContent = await _criptoService.decrypt(data['content']);
+          final keysUsed = data['encryptionKeys'] as Map<String, dynamic>;
+          final senderKey = keysUsed['senderPublicKey'];
+          final receiverKey = keysUsed['receiverPublicKey'];
+
+          // Logs de depuração
+          final myCurrentActiveKey = await _criptoService.getActivePublicKey();
+          print("   🔑 Minha Chave Ativa ATUAL é: ${myCurrentActiveKey.substring(0, 15)}...");
+          print("   🏷️ Chave do Remetente na Etiqueta: ${senderKey.substring(0, 15)}...");
+          print("   🏷️ Chave do Destinatário na Etiqueta: ${receiverKey.substring(0, 15)}...");
+
+          final historicSecretKey = await _criptoService.deriveSecretKeyFromHistoricMessage(
+            key1Base64: senderKey,
+            key2Base64: receiverKey,
+          );
+
+          final decryptedContent = await _criptoService.decrypt(data['content'], secretKey: historicSecretKey);
+          
+          print("   ✅ Descriptografia bem-sucedida!");
           messages.add(ChatMessage(
             senderId: data['senderId'],
             content: decryptedContent,
           ));
         } catch (e) {
-          print("Erro ao descriptografar: $e");
+          print("   ❌ FALHA AO DESCRIPTOGRAFAR: $e");
           messages.add(ChatMessage(
             senderId: data['senderId'],
-            content: "⚠️ Mensagem corrompida.",
+            content: "🔒 (Histórico criptografado)",
           ));
         }
       }

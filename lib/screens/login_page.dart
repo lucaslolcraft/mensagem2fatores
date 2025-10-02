@@ -12,12 +12,15 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  // Serviços
   final CriptoService _criptoService = CriptoService();
   final ChatService _chatService = ChatService();
   
+  // Controladores de Texto
   final TextEditingController _myIdController = TextEditingController();
   final TextEditingController _partnerIdController = TextEditingController();
 
+  // Variáveis de estado
   bool _isConnecting = false;
   String _statusMessage = '';
   StreamSubscription? _keySubscription;
@@ -42,50 +45,50 @@ class _LoginPageState extends State<LoginPage> {
     final myId = _myIdController.text.trim();
     final partnerId = _partnerIdController.text.trim();
 
-    if (myId.isEmpty || partnerId.isEmpty || myId == partnerId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('IDs inválidos. Preencha ambos e use IDs diferentes.')),
-      );
-      return;
-    }
+    // ... (validação de IDs)
 
-    setState(() { _isConnecting = true; _statusMessage = '1/3 - Gerando chaves...'; });
+    // MUDANÇA: Informe ao CriptoService qual chaveiro usar ANTES de tudo.
+    _criptoService.setUserId(myId);
 
-    await _criptoService.loadOrGenerateKeys(validity: const Duration(minutes: 5));
-    
-    final myPublicKey = await _criptoService.getPublicKeyAsString();
-    
-    setState(() { _statusMessage = '2/3 - Publicando sua chave...'; });
-    
-    await _chatService.publishPublicKey(myId: myId, publicKey: myPublicKey);
+    setState(() { _isConnecting = true; _statusMessage = '1/3 - Preparando chaveiro local...'; });
 
-    setState(() { _statusMessage = '3/3 - Aguardando o parceiro...'; });
+    // PASSO 1: Agora o initializeKeys vai operar no chaveiro correto (ex: 'crypto_keychain_alice')
+    await _criptoService.initializeKeys(validity: const Duration(minutes: 5));
+    final myActivePublicKey = await _criptoService.getActivePublicKey();
+    
+    setState(() { _statusMessage = '2/3 - Publicando chave pública no servidor...'; });
+    
+    // PASSO 2: Publica nossa chave ATIVA no Firestore para o parceiro encontrar
+    await _chatService.publishPublicKey(myId: myId, publicKey: myActivePublicKey);
+
+    setState(() { _statusMessage = '3/3 - Aguardando o parceiro ficar online...'; });
     
     final timeout = Timer(const Duration(seconds: 45), () {
         if (mounted && _isConnecting) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tempo esgotado.')));
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tempo esgotado. Verifique se o parceiro está conectando.')));
             _resetState();
         }
     });
 
-    // Ouve pela chave do parceiro no Firestore
-    _keySubscription = _chatService.listenForPartnerKey(partnerId).listen((partnerPublicKey) async {
-      timeout.cancel();
+    // PASSO 3: Ouve pela chave pública ATIVA que o parceiro publicou no Firestore
+    _keySubscription = _chatService.listenForPartnerKey(partnerId).listen((partnerActivePublicKey) {
+      timeout.cancel(); // Parceiro encontrado, cancela o timeout
       
-      await _criptoService.deriveSharedSecret(partnerPublicKey);
-      
-      // Inicializa o serviço com os IDs para criar o chatID
+      // PASSO 4: Temos tudo! Inicializa o serviço de chat com todos os dados
       _chatService.initialize(
         criptoService: _criptoService,
         myId: myId,
         partnerId: partnerId,
+        myActivePublicKey: myActivePublicKey,
+        partnerActivePublicKey: partnerActivePublicKey,
       );
 
+      // PASSO 5: Navega para a tela de chat
       if (mounted) {
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (context) => ChatPage(
-            myId: myId,       // Passa o ID humano (ex: "alice")
-            partnerId: partnerId, // Passa o ID humano (ex: "bob")
+            myId: myId,
+            partnerId: partnerId,
             chatService: _chatService,
           ),
         ));
@@ -95,8 +98,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // A UI (build method) pode continuar exatamente a mesma de antes.
-    // ... cole aqui o seu método build() da LoginPage anterior ...
     return Scaffold(
       appBar: AppBar(title: const Text('Conectar ao Chat Seguro')),
       body: Center(
