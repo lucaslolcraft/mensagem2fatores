@@ -5,8 +5,8 @@ import '../services/cripto_service.dart';
 import 'chat_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-
+  const LoginPage({super.key, this.initialMyId});
+  final String? initialMyId;
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -15,15 +15,26 @@ class _LoginPageState extends State<LoginPage> {
   // Serviços
   final CriptoService _criptoService = CriptoService();
   final ChatService _chatService = ChatService();
-  
+
   // Controladores de Texto
   final TextEditingController _myIdController = TextEditingController();
   final TextEditingController _partnerIdController = TextEditingController();
+
+  bool _lockMyId = false;
 
   // Variáveis de estado
   bool _isConnecting = false;
   String _statusMessage = '';
   StreamSubscription? _keySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialMyId != null && widget.initialMyId!.isNotEmpty) {
+      _myIdController.text = widget.initialMyId!;
+      _lockMyId = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -50,30 +61,48 @@ class _LoginPageState extends State<LoginPage> {
     // MUDANÇA: Informe ao CriptoService qual chaveiro usar ANTES de tudo.
     _criptoService.setUserId(myId);
 
-    setState(() { _isConnecting = true; _statusMessage = '1/3 - Preparando chaveiro local...'; });
+    setState(() {
+      _isConnecting = true;
+      _statusMessage = '1/3 - Preparando chaveiro local...';
+    });
 
     // PASSO 1: Agora o initializeKeys vai operar no chaveiro correto (ex: 'crypto_keychain_alice')
     await _criptoService.initializeKeys(validity: const Duration(minutes: 5));
     final myActivePublicKey = await _criptoService.getActivePublicKey();
-    
-    setState(() { _statusMessage = '2/3 - Publicando chave pública no servidor...'; });
-    
-    // PASSO 2: Publica nossa chave ATIVA no Firestore para o parceiro encontrar
-    await _chatService.publishPublicKey(myId: myId, publicKey: myActivePublicKey);
 
-    setState(() { _statusMessage = '3/3 - Aguardando o parceiro ficar online...'; });
-    
+    setState(() {
+      _statusMessage = '2/3 - Publicando chave pública no servidor...';
+    });
+
+    // PASSO 2: Publica nossa chave ATIVA no Firestore para o parceiro encontrar
+    await _chatService.publishPublicKey(
+      myId: myId,
+      publicKey: myActivePublicKey,
+    );
+
+    setState(() {
+      _statusMessage = '3/3 - Aguardando o parceiro ficar online...';
+    });
+
     final timeout = Timer(const Duration(seconds: 45), () {
-        if (mounted && _isConnecting) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tempo esgotado. Verifique se o parceiro está conectando.')));
-            _resetState();
-        }
+      if (mounted && _isConnecting) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Tempo esgotado. Verifique se o parceiro está conectando.',
+            ),
+          ),
+        );
+        _resetState();
+      }
     });
 
     // PASSO 3: Ouve pela chave pública ATIVA que o parceiro publicou no Firestore
-    _keySubscription = _chatService.listenForPartnerKey(partnerId).listen((partnerActivePublicKey) {
+    _keySubscription = _chatService.listenForPartnerKey(partnerId).listen((
+      partnerActivePublicKey,
+    ) {
       timeout.cancel(); // Parceiro encontrado, cancela o timeout
-      
+
       // PASSO 4: Temos tudo! Inicializa o serviço de chat com todos os dados
       _chatService.initialize(
         criptoService: _criptoService,
@@ -85,13 +114,15 @@ class _LoginPageState extends State<LoginPage> {
 
       // PASSO 5: Navega para a tela de chat
       if (mounted) {
-        Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (context) => ChatPage(
-            myId: myId,
-            partnerId: partnerId,
-            chatService: _chatService,
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ChatPage(
+              myId: myId,
+              partnerId: partnerId,
+              chatService: _chatService,
+            ),
           ),
-        ));
+        );
       }
     });
   }
@@ -108,13 +139,19 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               TextField(
                 controller: _myIdController,
-                decoration: const InputDecoration(labelText: 'Seu ID (Ex: alice)'),
-                enabled: !_isConnecting,
+                decoration: const InputDecoration(
+                  labelText: 'Seu Id',
+                  suffixIcon: Icon(Icons.lock_outline),
+                ),
+                enabled: !_lockMyId,
+                readOnly: _lockMyId,
               ),
               const SizedBox(height: 20),
               TextField(
                 controller: _partnerIdController,
-                decoration: const InputDecoration(labelText: 'ID do Parceiro (Ex: bob)'),
+                decoration: const InputDecoration(
+                  labelText: 'ID do Parceiro (Ex: bob)',
+                ),
                 enabled: !_isConnecting,
               ),
               const SizedBox(height: 30),
@@ -130,9 +167,12 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 20),
                     Text(_statusMessage, textAlign: TextAlign.center),
                     const SizedBox(height: 10),
-                    TextButton(onPressed: _resetState, child: const Text('Cancelar'))
+                    TextButton(
+                      onPressed: _resetState,
+                      child: const Text('Cancelar'),
+                    ),
                   ],
-                )
+                ),
             ],
           ),
         ),
