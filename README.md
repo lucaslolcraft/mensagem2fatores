@@ -1,18 +1,25 @@
-# Asymmetric Encryption Chat Application
+# Aplicativo de Chat com Criptografia Assimétrica
 
-This application demonstrates a secure chat application utilizing asymmetric encryption methods.
+Este aplicativo de chat utiliza criptografia assimétrica para garantir a segurança e a privacidade das comunicações entre os usuários. A criptografia assimétrica usa pares de chaves: uma chave pública, que é compartilhada com qualquer pessoa, e uma chave privada, que é mantida em segredo pelo proprietário.
 
-## Key Features
-- **Privacy**: Messages are encrypted in such a way that even the server cannot access the contents. Only the intended recipient holds the decryption key.
-- **Security**: Employs advanced cryptographic algorithms to ensure message integrity and confidentiality.
+## Funcionalidades
 
-## How It Works
-1. **Message Encryption**: The sender encrypts the message using the recipient's public key.
-2. **Message Transmission**: The encrypted message is sent to the server.
-3. **Message Decryption**: The recipient uses their private key to decrypt the message, ensuring security and privacy.
+- **Troca Segura de Mensagens**: As mensagens são criptografadas com a chave pública do destinatário, garantindo que apenas ele possa decifrá-las com sua chave privada.
+- **Verificação de Identidade**: As chaves públicas podem ser usadas para verificar a identidade dos usuários, assegurando que as mensagens não sejam forjadas.
+- **Fácil de Usar**: Uma interface amigável para facilitar a comunicação segura entre os usuários.
 
-## Benefits
-- Ensures that only the intended recipient can read the messages.
-- Reduces the risk of data breaches by keeping encrypted messages inaccessible to unauthorized parties.
+## Como Funciona
 
-This technology is essential for building secure communication systems in today's digital landscape.
+1. **Registro**: Os usuários precisam criar uma conta, onde gerarão suas chaves pública e privada.
+2. **Envio de Mensagens**: Para enviar uma mensagem, o remetente a criptografa usando a chave pública do destinatário.
+3. **Recebimento de Mensagens**: O destinatário usa sua chave privada para decifrar a mensagem recebida.
+
+## Instalação
+
+Siga os passos abaixo para instalar o aplicativo:
+
+```bash
+$ git clone https://github.com/lucaslolcraft/mensagem2fatores.git
+$ cd mensagem2fatores
+$ npm install
+$ npm start
