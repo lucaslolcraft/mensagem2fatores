@@ -1,24 +1,54 @@
-# Aplicativo de Chat com Criptografia Assimétrica
+# 📩 Mensagem2Fatores
 
-Este aplicativo de chat utiliza criptografia assimétrica para garantir a segurança e a privacidade das comunicações entre os usuários. A criptografia assimétrica usa pares de chaves: uma chave pública, que é compartilhada com qualquer pessoa, e uma chave privada, que é mantida em segredo pelo proprietário.
+Projeto universitário em **Flutter** que demonstra o uso de **criptografia assimétrica** em um chat.
 
-## Funcionalidades
+O objetivo é mostrar que, usando chaves pública/privada, **apenas os usuários conseguem ler as mensagens**, enquanto o **servidor não tem acesso ao conteúdo**.
 
-- **Troca Segura de Mensagens**: As mensagens são criptografadas com a chave pública do destinatário, garantindo que apenas ele possa decifrá-las com sua chave privada.
-- **Verificação de Identidade**: As chaves públicas podem ser usadas para verificar a identidade dos usuários, assegurando que as mensagens não sejam forjadas.
+---
 
-## Como Funciona
+## 🔒 Como funciona
 
-1. **Registro**: Os usuários precisam criar uma conta, onde gerarão suas chaves pública e privada.
-2. **Envio de Mensagens**: Para enviar uma mensagem, o remetente a criptografa usando a chave pública do destinatário.
-3. **Recebimento de Mensagens**: O destinatário usa sua chave privada para decifrar a mensagem recebida.
+- Cada usuário gera um par de chaves (pública/privada)
+- A mensagem é criptografada com a chave pública do destinatário
+- Apenas a chave privada do destinatário consegue descriptografar
 
-## Instalação
+---
 
-Siga os passos abaixo para instalar o aplicativo(é necessario fazer 2 instancias para que o aplicativo seja testado):
+## 🚀 Executar o projeto
 
+Clone o repositório:
 ```bash
-$ git clone https://github.com/lucaslolcraft/mensagem2fatores.git
-$ cd mensagem2fatores
-$ npm install
-$ npm start
+git clone https://github.com/lucaslolcraft/mensagem2fatores
+```
+Entre na pasta:
+```bash
+cd mensagem2fatores
+```
+Instale as dependências:
+```bash
+flutter pub get
+```
+Execute:
+```bash
+run.bat
+```
+---
+
+## ⚠️ Limitações
+
+- Funciona apenas com os dois usuários online ao mesmo tempo
+- Projeto apenas educacional (não produção)
+
+---
+
+## 🛠️ Tecnologias
+
+- Flutter
+- Dart
+- Criptografia assimétrica
+
+---
+
+## 🎓 Finalidade
+
+Trabalho acadêmico para demonstrar conceitos de segurança e criptografia em aplicações móveis.
