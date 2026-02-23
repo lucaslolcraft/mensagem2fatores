@@ -6,7 +6,6 @@ Este aplicativo de chat utiliza criptografia assimétrica para garantir a segura
 
 - **Troca Segura de Mensagens**: As mensagens são criptografadas com a chave pública do destinatário, garantindo que apenas ele possa decifrá-las com sua chave privada.
 - **Verificação de Identidade**: As chaves públicas podem ser usadas para verificar a identidade dos usuários, assegurando que as mensagens não sejam forjadas.
-- **Fácil de Usar**: Uma interface amigável para facilitar a comunicação segura entre os usuários.
 
 ## Como Funciona
 
@@ -16,7 +15,7 @@ Este aplicativo de chat utiliza criptografia assimétrica para garantir a segura
 
 ## Instalação
 
-Siga os passos abaixo para instalar o aplicativo:
+Siga os passos abaixo para instalar o aplicativo(é necessario fazer 2 instancias para que o aplicativo seja testado):
 
 ```bash
 $ git clone https://github.com/lucaslolcraft/mensagem2fatores.git
